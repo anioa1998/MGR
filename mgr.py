@@ -67,6 +67,6 @@ prepareData(irisset)
 #neigh.fit(samples)
 #NearestNeighbors(n_neighbors=1)
 #print(neigh.kneighbors([[1., 1., 1.]]))
-#test change
+#test change2
 
 	
