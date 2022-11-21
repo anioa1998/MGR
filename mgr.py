@@ -23,7 +23,7 @@ def prepareData(dataframe):
 def oppositeClassCount(x, y, k, resultDateFrame): 
     neigh = NearestNeighbors(n_neighbors=k+1) 
     neigh.fit(x,y)
-    
+
     newColumnName = f"knn{k}"
     resultDateFrame[newColumnName] = np.nan
 
@@ -43,7 +43,34 @@ def oppositeClassCount(x, y, k, resultDateFrame):
                      counter = counter + 1 
         resultDateFrame.at[index, newColumnName] = counter
 
-        #Aktualnie 5x 3 sąsiadów przeciwnej klasy - bazujemy na poprawnych danych y, jak wyodrębnić x i y bez testowanego obiektu?
+        #Aktualnie (knn3) 5x 3 sąsiadów przeciwnej klasy - bazujemy na poprawnych danych y, jak wyodrębnić x i y bez testowanego obiektu?
+
+def meanDistanceFromNN(x, y, k, resultDateFrame):
+    neigh = NearestNeighbors(n_neighbors=k+1) 
+    neigh.fit(x,y)
+
+    newColumnName = f"meanDistance{k}"
+    resultDateFrame[newColumnName] = np.nan
+
+    for index, row in x.iterrows():
+
+        #Set knn  
+        neighbors_distance = neigh.kneighbors([row], return_distance=True)
+
+        neighbors_distance = list(neighbors_distance[0][0])
+        neighbors_distance.remove(0.0)
+    
+        #Calculate mean distance
+        mean = np.mean(neighbors_distance)
+        resultDateFrame.at[index, newColumnName] = mean
+
+def smallestDistanceSameClass(x, y, k, resultDateFrame):
+     #xxxx
+    test = 'x'
+
+def smallestDistanceAnyClass(x, y, k, resultDateFrame):
+    #xxxx
+    test = 'x'
 
 irisset = pd.read_csv( 
     filepath_or_buffer="Iris.csv", 
@@ -56,4 +83,6 @@ resultDataFrame = prepareResultDataframe(x)
 k_values = list([3,5,7,8,9,11,12,14,15,17])
 for k in k_values:
     oppositeClassCount(x, y, k, resultDataFrame)
+for k in k_values:
+    meanDistanceFromNN(x, y, k, resultDataFrame)
 s = "test"
