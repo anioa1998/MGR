@@ -22,7 +22,8 @@ def prepareData(dataframe):
 
 def oppositeClassCount(x, y, k, resultDateFrame): 
     neigh = NearestNeighbors(n_neighbors=k+1) 
-
+    neigh.fit(x,y)
+    
     newColumnName = f"knn{k}"
     resultDateFrame[newColumnName] = np.nan
 
@@ -35,7 +36,6 @@ def oppositeClassCount(x, y, k, resultDateFrame):
 
         row_type = y[index] 
         counter = 0 
-
     
         #Get type of neighbors 
         for i in neighbors_ids: 
@@ -53,5 +53,7 @@ irisset = pd.read_csv(
 irisset = irisset.set_index("Id") 
 x, y = prepareData(irisset) 
 resultDataFrame = prepareResultDataframe(x)
-oppositeClassCount(x, y, 3, resultDataFrame)
+k_values = list([3,5,7,8,9,11,12,14,15,17])
+for k in k_values:
+    oppositeClassCount(x, y, k, resultDataFrame)
 s = "test"
