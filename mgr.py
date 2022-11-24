@@ -1,72 +1,114 @@
-import pandas as pd
-from sklearn.neighbors import NearestNeighbors
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+import pandas as pd 
+import numpy as np
+from sklearn.neighbors import NearestNeighbors 
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler 
+ 
+
+def prepareData(dataframe): 
+    x = pd.DataFrame(dataframe.iloc[:, 0:4]) 
+    y = pd.DataFrame(dataframe.iloc[:,4]) 
+
+    y = LabelEncoder().fit_transform(y) 
+    x = MinMaxScaler().fit_transform(x) 
+
+    x = pd.DataFrame.from_records(x) 
+
+    return x,y 
+
+def prepareResultDataframe(x): 
+    result_dataframe = pd.DataFrame(index = x.index.copy()) 
+    return result_dataframe 
+
+def prepareKNN(result_dataframe, new_column_name, x, y, k):
+    neigh = NearestNeighbors(n_neighbors=k+1) 
+    neigh.fit(x,y)
+
+    result_dataframe[new_column_name] = np.nan
+    return neigh, new_column_name
 
 
-def prepareData(dateframe):
-    x = pd.DataFrame(dateframe.iloc[:, 0:4])
-    y = pd.DataFrame(dateframe.iloc[:,4])
+def oppositeClassCount(x, y, k, result_dataframe): 
 
-    # skonwertuj kategorie na liczby
-    y = LabelEncoder().fit_transform(y)
+    neigh, new_column_name = prepareKNN(result_dataframe, f"oppositeClassNeighbors{k}", x, y, k)
 
-    # skonwertuj długości nma zakresy 0.0 - 1.0
-    x = MinMaxScaler().fit_transform(x)
+    for index, row in x.iterrows():
 
-    # skonwertuj typ z ndarray na DataFrame (wymagane przez klasyfikatory)
-    x = pd.DataFrame.from_records(x)
-    s = 'test'
+        #Set knn  
+        neighbors_ids = neigh.kneighbors([row], return_distance=False)
+        neighbors_ids = list(neighbors_ids[0])
+        neighbors_ids.remove(index)
 
-
-def oppositeClassCount(data, k):
-    neigh = NearestNeighbors(n_neighbors=k)
+        row_type = y[index] 
+        counter = 0 
     
-    for index, row in data.iterrows():
-        #Initialization
-        type_list = []
-        
-        #Prepare data
-        test_row = row.drop("Species").to_frame().transpose()
-        test_dateframe = data.drop(index)
-        test_x = test_dateframe.drop("Species", axis=1)
-        test_y = list(test_dateframe.iloc[:,-1])
-        
-        #Get neighbors
-        neigh.fit(test_x,test_y)
-        neighbors_ids = neigh.kneighbors(test_row,return_distance=False)
-        
-        #Get type of neighbors
-        for i in neighbors_ids:
-            type_list.append(test_y[i.astype(int)]) 
-  
-        
+        #Get type of neighbors 
+        for i in neighbors_ids: 
+        	if y[i] != row_type: 
+                     counter = counter + 1 
+        result_dataframe.at[index, new_column_name] = int(counter)
 
-irisset = pd.read_csv(
-	filepath_or_buffer='C:\\Users\\Ania\\Desktop\\_STUDIA\\MGR\\iris.csv',
-	sep=',',
-	encoding='utf-8'
-)
-irisset = irisset.set_index('Id')
-prepareData(irisset)
+        #Aktualnie (knn3) 5x 3 sąsiadów przeciwnej klasy - bazujemy na poprawnych danych y, jak wyodrębnić x i y bez testowanego obiektu?
 
-#oppositeClassCount(irisset,3)
+def meanDistanceFromNN(x, y, k, result_dataframe):
 
+    neigh, new_column_name = prepareKNN(result_dataframe, f"meanDistance{k}", x, y, k)
 
-#x = iris.data
-#y = iris.target
-#knn = KNeighborsClassifier(n_neighbors = 6)
+    for index, row in x.iterrows():
 
-#knn.fit(x,y)
-#yp = knn.predict(x)
-#acc = metrics.accuracy_score(y, yp)
-#print(f"Dokladnosc {acc}")
+        #Set knn  
+        neighbors_distance = neigh.kneighbors([row], return_distance=True)
+        neighbors_distance = list(neighbors_distance[0][0])
+        neighbors_distance.remove(0.0)
+    
+        #Calculate mean distance
+        mean = np.mean(neighbors_distance)
+        result_dataframe.at[index, new_column_name] = mean
 
-#samples = [[0., 0., 0.], [0., .5, 0.], [1., 1., .5]]
-#from sklearn.neighbors import NearestNeighbors
-#neigh = NearestNeighbors(n_neighbors=1)
-#neigh.fit(samples)
-#NearestNeighbors(n_neighbors=1)
-#print(neigh.kneighbors([[1., 1., 1.]]))
+def smallestDistanceSameClass(x, y, k, result_dataframe):
+
+    neigh, new_column_name = prepareKNN(result_dataframe, f"smallestDistanceSameClass", x, y, k)
+    for index, row in x.iterrows():
+
+        #Set knn  
+        neighbors = neigh.kneighbors([row], return_distance=True)
+        neighbors_ids = list(neighbors[1][0])
+        neighbors_distance = list(neighbors[0][0])
+        neighbors_ids.remove(index)
+        neighbors_distance.remove(0.0)
+
+        smallest_distance = np.nan
+
+        neighbors_dictionary = dict(zip(neighbors_ids, neighbors_distance))
+        row_type = y[index]
+        for i in neighbors_ids: 
+        	if y[i] == row_type: 
+                    smallest_distance = neighbors_dictionary[i]
+        result_dataframe.at[index, new_column_name] = smallest_distance
 
 
-	
+def smallestDistanceAnyClass(x, y, k, result_dataframe):
+
+    neigh, new_column_name = prepareKNN(result_dataframe, f"smallestDistanceAnyClass", x, y, k)
+    for index, row in x.iterrows():
+        #Set knn  
+        neighbors = neigh.kneighbors([row], return_distance=True)
+        neighbors_distance = list(neighbors[0][0])
+        neighbors_distance.remove(0.0)
+        result_dataframe.at[index, new_column_name] = neighbors_distance[0]
+
+
+irisset = pd.read_csv( 
+    filepath_or_buffer="Iris.csv", 
+    sep=",", 
+    encoding="utf-8") 
+
+irisset = irisset.set_index("Id") 
+x, y = prepareData(irisset) 
+resultDataFrame = prepareResultDataframe(x)
+k_values = list([3,5,7])
+for k in k_values:
+    oppositeClassCount(x, y, k, resultDataFrame)
+    meanDistanceFromNN(x, y, k, resultDataFrame)
+    smallestDistanceSameClass(x, y, k, resultDataFrame)
+    smallestDistanceAnyClass(x, y, k, resultDataFrame)
+s = "test"
