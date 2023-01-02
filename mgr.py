@@ -40,24 +40,34 @@ def createNewColumn(result_dataframe, new_column_name):
 def setKColumns(k, result_dataframe):
     new_columns = ["oppositeClassNeighbors", "sameClassNeighbors", "meanDistanceAny", "meanDistanceSame"]
     for column in new_columns:
-        column = column + k
-        createNewColumn(resultDataFrame, column)
+        column = column + str(k)
+        createNewColumn(result_dataframe, column)
 
     return new_columns
 
 def getNeighbourTypesById(y, neighbors_ids):
     result_dict = dict()
     for id in neighbors_ids:
-        result_dict.update(zip(id, y[id]))
+        result_dict[id] = y[id]
 
     return result_dict
 #----------------------------------------------------------------------------------------------------------
 
 def oppositeClassCount(index, neighbors_types: dict, result_dataframe, row_type, k): 
 
+    if index == 70:
+        d = "test"
+    if index == 83:
+        d = "test"
+    if index == 106:
+        d = "test"
+    if index == 119:
+        d = "test"
+    if index == 133:
+        d = "test"
     counter = 0
     #Get type of neighbors 
-    for neighbor_type in neighbors_types.values: 
+    for neighbor_type in neighbors_types.values(): 
         if neighbor_type != row_type: 
             counter = counter + 1 
     result_dataframe.at[index, f"oppositeClassNeighbors{k}"] = int(counter)
@@ -66,8 +76,8 @@ def sameClassCount(index, neighbors_types: dict, result_dataframe, row_type, k):
     
     counter = 0
     #Get type of neighbors 
-    for neighbor_type in neighbors_types.values: 
-        if neighbor_type != row_type: 
+    for neighbor_type in neighbors_types.values(): 
+        if neighbor_type == row_type: 
             counter = counter + 1 
     result_dataframe.at[index, f"sameClassNeighbors{k}"] = int(counter)
 
@@ -79,14 +89,18 @@ def meanDistanceFromAny(neighbors_distance, k, result_dataframe):
     mean = np.mean(neighbors_distance)
     result_dataframe.at[index, f"meanDistanceAny{k}"] = mean
 
-def meanDistanceFromSame(neighbors_ids, neighbors_distance, neighbors_types: dict, y, index, row_type, k):
+def meanDistanceFromSame(neighbors_ids, neighbors_distance, neighbors_types: dict, index, row_type, k, result_dataframe):
     mean = np.nan
 
+    if row_type not in neighbors_types.values():
+        return
+
     neighbors_dictionary = dict(zip(neighbors_ids, neighbors_distance))
-    neighbors_types
+    filtered_types_dict = {k : v for k, v in neighbors_types.items() if v == row_type}
+    distance_list = [neighbors_dictionary[i] for i in filtered_types_dict.keys()]
 
-
-
+    mean = np.mean(distance_list)
+    result_dataframe.at[index, f"meanDistanceSame{k}"] = mean
     
 
 def smallestDistanceSameClass(x, y, k, result_dataframe):
@@ -129,21 +143,23 @@ irisset = pd.read_csv(
 
 irisset = irisset.set_index("Id") 
 x, y = prepareData(irisset) 
-resultDataFrame = prepareResultDataframe(x)
+result_dataframe = prepareResultDataframe(x)
 k_values = list([3,5,7])
 
 for k in k_values:
     neigh = prepareKNN(x,y,k)
-    new_columns = setKColumns(k, resultDataFrame)
+    new_columns = setKColumns(k, result_dataframe)
 
     for index, row in x.iterrows():
         neighbors_ids, neighbors_distance = getNearestNeighbours(neigh, index, row)
         neighbors_types = getNeighbourTypesById(y, neighbors_ids)
         row_type = y[index]
         
-        oppositeClassCount(index, neighbors_types, resultDataFrame, row_type, k)
-        meanDistanceFromAny(x, y, k, resultDataFrame)
-
-    smallestDistanceSameClass(x, y, k, resultDataFrame)
-    smallestDistanceAnyClass(x, y, k, resultDataFrame)
+        oppositeClassCount(index, neighbors_types, result_dataframe, row_type, k)
+        sameClassCount(index, neighbors_types, result_dataframe, row_type, k)
+        meanDistanceFromAny(neighbors_distance, k, result_dataframe)
+        meanDistanceFromSame(neighbors_ids, neighbors_distance, neighbors_types, index, row_type, k, result_dataframe)
+    
+    #smallestDistanceSameClass(x, y, k, result_dataframe)
+   # smallestDistanceAnyClass(x, y, k, result_dataframe)
 s = "test"
