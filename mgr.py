@@ -20,7 +20,7 @@ def prepareResultDataframe(x):
     return result_dataframe 
 
 def prepareKNN(x, y, k):
-    neigh = NearestNeighbors(n_neighbors=k+1) 
+    neigh = NearestNeighbors(n_neighbors=k+1, metric="euclidean") 
     neigh.fit(x,y)
     
     return neigh
@@ -43,7 +43,10 @@ def setKColumns(k, result_dataframe):
         column = column + str(k)
         createNewColumn(result_dataframe, column)
 
-    return new_columns
+def setSingleColumns(result_dataframe):
+    new_columns = ["minDistanceSameClass", "minDistanceAnyClass", "minDistanceOppositeClass"]
+    for column in new_columns:
+        createNewColumn(result_dataframe, column)
 
 def getNeighbourTypesById(y, neighbors_ids):
     result_dict = dict()
@@ -51,20 +54,23 @@ def getNeighbourTypesById(y, neighbors_ids):
         result_dict[id] = y[id]
 
     return result_dict
+
+def distanceFilteredBySameType(neighbors_ids, neighbors_distance, neighbors_types: dict, row_type):
+    
+    neighbors_dictionary = dict(zip(neighbors_ids, neighbors_distance))
+    filtered_types_dict = {k : v for k, v in neighbors_types.items() if v == row_type}
+    return [neighbors_dictionary[i] for i in filtered_types_dict.keys()]
+
+def distanceFilteredByOppositeType(neighbors_ids, neighbors_distance, neighbors_types: dict, row_type):
+    
+    neighbors_dictionary = dict(zip(neighbors_ids, neighbors_distance))
+    filtered_types_dict = {k : v for k, v in neighbors_types.items() if v != row_type}
+    return [neighbors_dictionary[i] for i in filtered_types_dict.keys()]
+
 #----------------------------------------------------------------------------------------------------------
 
 def oppositeClassCount(index, neighbors_types: dict, result_dataframe, row_type, k): 
 
-    if index == 70:
-        d = "test"
-    if index == 83:
-        d = "test"
-    if index == 106:
-        d = "test"
-    if index == 119:
-        d = "test"
-    if index == 133:
-        d = "test"
     counter = 0
     #Get type of neighbors 
     for neighbor_type in neighbors_types.values(): 
@@ -83,7 +89,7 @@ def sameClassCount(index, neighbors_types: dict, result_dataframe, row_type, k):
 
         #Aktualnie (knn3) 5x 3 sąsiadów przeciwnej klasy - bazujemy na poprawnych danych y, jak wyodrębnić x i y bez testowanego obiektu?
 
-def meanDistanceFromAny(neighbors_distance, k, result_dataframe):
+def meanDistanceFromAny(index, neighbors_distance, k, result_dataframe):
 
     #Calculate mean distance
     mean = np.mean(neighbors_distance)
@@ -95,45 +101,37 @@ def meanDistanceFromSame(neighbors_ids, neighbors_distance, neighbors_types: dic
     if row_type not in neighbors_types.values():
         return
 
-    neighbors_dictionary = dict(zip(neighbors_ids, neighbors_distance))
-    filtered_types_dict = {k : v for k, v in neighbors_types.items() if v == row_type}
-    distance_list = [neighbors_dictionary[i] for i in filtered_types_dict.keys()]
+    distance_list = distanceFilteredBySameType(neighbors_ids, neighbors_distance, neighbors_types, row_type)
 
     mean = np.mean(distance_list)
     result_dataframe.at[index, f"meanDistanceSame{k}"] = mean
     
 
-def smallestDistanceSameClass(x, y, k, result_dataframe):
+def smallestDistanceSameClass(neighbors_ids, neighbors_distance, neighbors_types: dict, index, row_type, result_dataframe):
 
-    neigh, new_column_name = prepareKNN(result_dataframe, f"smallestDistanceSameClass", x, y, k)
-    for index, row in x.iterrows():
+    if str(result_dataframe.at[index, "minDistanceSameClass"]) == 'nan':
+        
+        if row_type not in neighbors_types.values():
+            return
 
-        #Set knn  
-        neighbors = neigh.kneighbors([row], return_distance=True)
-        neighbors_ids = list(neighbors[1][0])
-        neighbors_distance = list(neighbors[0][0])
-        neighbors_ids.remove(index)
-        neighbors_distance.remove(0.0)
+        distance_list = distanceFilteredBySameType(neighbors_ids, neighbors_distance, neighbors_types, row_type)
+        result_dataframe.at[index, "minDistanceSameClass"] = min(distance_list)
+        
+def smallestDistanceOppositeClass(neighbors_ids, neighbors_distance, neighbors_types: dict, index, row_type, result_dataframe):
 
-        smallest_distance = np.nan
+    if str(result_dataframe.at[index, "minDistanceOppositeClass"]) == 'nan':
+        
+        if all(type_from_list == row_type for type_from_list in neighbors_types.values()):
+            return
 
-        neighbors_dictionary = dict(zip(neighbors_ids, neighbors_distance))
-        row_type = y[index]
-        for i in neighbors_ids: 
-        	if y[i] == row_type: 
-                    smallest_distance = neighbors_dictionary[i]
-        result_dataframe.at[index, new_column_name] = smallest_distance
+        distance_list = distanceFilteredByOppositeType(neighbors_ids, neighbors_distance, neighbors_types, row_type)
+        result_dataframe.at[index, "minDistanceOppositeClass"] = min(distance_list)
 
 
-def smallestDistanceAnyClass(x, y, k, result_dataframe):
+def smallestDistanceAnyClass(neighbors_distance, index, result_dataframe):
 
-    neigh, new_column_name = prepareKNN(result_dataframe, f"smallestDistanceAnyClass", x, y, k)
-    for index, row in x.iterrows():
-        #Set knn  
-        neighbors = neigh.kneighbors([row], return_distance=True)
-        neighbors_distance = list(neighbors[0][0])
-        neighbors_distance.remove(0.0)
-        result_dataframe.at[index, new_column_name] = neighbors_distance[0]
+    if str(result_dataframe.at[index, "minDistanceAnyClass"]) == 'nan':
+        result_dataframe.at[index, "minDistanceAnyClass"] = min(neighbors_distance)
 
 
 irisset = pd.read_csv( 
@@ -148,18 +146,25 @@ k_values = list([3,5,7])
 
 for k in k_values:
     neigh = prepareKNN(x,y,k)
-    new_columns = setKColumns(k, result_dataframe)
+    setSingleColumns(result_dataframe)
+    setKColumns(k, result_dataframe)
 
     for index, row in x.iterrows():
+        
         neighbors_ids, neighbors_distance = getNearestNeighbours(neigh, index, row)
         neighbors_types = getNeighbourTypesById(y, neighbors_ids)
         row_type = y[index]
         
         oppositeClassCount(index, neighbors_types, result_dataframe, row_type, k)
         sameClassCount(index, neighbors_types, result_dataframe, row_type, k)
-        meanDistanceFromAny(neighbors_distance, k, result_dataframe)
+        meanDistanceFromAny(index, neighbors_distance, k, result_dataframe)
         meanDistanceFromSame(neighbors_ids, neighbors_distance, neighbors_types, index, row_type, k, result_dataframe)
+        smallestDistanceSameClass(neighbors_ids, neighbors_distance, neighbors_types, index, row_type, result_dataframe)
+        smallestDistanceOppositeClass(neighbors_ids, neighbors_distance, neighbors_types, index, row_type, result_dataframe)
+        smallestDistanceAnyClass(neighbors_distance, index, result_dataframe)
     
     #smallestDistanceSameClass(x, y, k, result_dataframe)
    # smallestDistanceAnyClass(x, y, k, result_dataframe)
+   
+
 s = "test"
