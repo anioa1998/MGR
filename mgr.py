@@ -140,20 +140,20 @@ irisset = pd.read_csv(
     encoding="utf-8") 
 
 irisset = irisset.set_index("Id") 
-x, y = prepareData(irisset) 
-result_dataframe = prepareResultDataframe(x)
+x_set, y_set = prepareData(irisset) 
+result_dataframe = prepareResultDataframe(x_set)
 k_values = list([3,5,7])
 
 for k in k_values:
-    neigh = prepareKNN(x,y,k)
+    neigh = prepareKNN(x_set,y_set,k)
     setSingleColumns(result_dataframe)
     setKColumns(k, result_dataframe)
 
-    for index, row in x.iterrows():
+    for index, row in x_set.iterrows():
         
         neighbors_ids, neighbors_distance = getNearestNeighbours(neigh, index, row)
-        neighbors_types = getNeighbourTypesById(y, neighbors_ids)
-        row_type = y[index]
+        neighbors_types = getNeighbourTypesById(y_set, neighbors_ids)
+        row_type = y_set[index]
         
         oppositeClassCount(index, neighbors_types, result_dataframe, row_type, k)
         sameClassCount(index, neighbors_types, result_dataframe, row_type, k)
@@ -163,8 +163,19 @@ for k in k_values:
         smallestDistanceOppositeClass(neighbors_ids, neighbors_distance, neighbors_types, index, row_type, result_dataframe)
         smallestDistanceAnyClass(neighbors_distance, index, result_dataframe)
     
-    #smallestDistanceSameClass(x, y, k, result_dataframe)
-   # smallestDistanceAnyClass(x, y, k, result_dataframe)
-   
+if result_dataframe['minDistanceOppositeClass'].isnull().any() | result_dataframe['minDistanceSameClass'].isnull().any():
+    count_entries = x_set.count()
+    perc10 = np.ceil(10*count_entries/100)
+    perc25 = np.ceil(25*count_entries/100)
+    perc50 = np.ceil(count_entries/2)
+
+    k_values = list([perc10, perc25, perc50, (count_entries-1)])
+    for k in k_values:
+        neigh = prepareKNN(x_set, y_set, k)
+        for index, row in x_set.iterrows():
+            if result_dataframe['minDistanceOppositeClass'].isnull().any():
+                smallestDistanceOppositeClass(neighbors_ids, neighbors_distance, neighbors_types, index, row_type, result_dataframe)
+            if result_dataframe['minDistanceSameClass'].isnull().any():
+                smallestDistanceSameClass(neighbors_ids, neighbors_distance, neighbors_types, index, row_type, result_dataframe)
 
 s = "test"
